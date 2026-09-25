@@ -196,7 +196,7 @@
                         <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                             <i data-lucide="search" class="w-4 h-4 text-slate-400"></i>
                         </div>
-                        <input type="text" id="searchInput" placeholder="Search item, desc, location..." class="pl-10 w-full bg-slate-50 border border-slate-300 text-slate-900 text-sm rounded-md focus:ring-brand-500 focus:border-brand-500 block px-3 py-2 outline-none">
+                        <input type="text" id="searchInput" placeholder="Search days aged (e.g. 2,3)" class="pl-10 w-full bg-slate-50 border border-slate-300 text-slate-900 text-sm rounded-md focus:ring-brand-500 focus:border-brand-500 block px-3 py-2 outline-none">
                     </div>
 
                     <!-- Location Dropdown -->
@@ -233,7 +233,7 @@
                     </button>
                 </div>
 
-                <div style="display: none;" class="w-full lg:w-auto flex justify-end">
+                <div class="w-full lg:w-auto flex justify-end">
                     <button id="btnExport" class="bg-brand-50 hover:bg-brand-100 text-brand-700 border border-brand-200 px-3 py-1.5 rounded-md text-sm font-medium transition-colors flex items-center gap-2 whitespace-nowrap">
                         <i data-lucide="download" class="w-4 h-4"></i> Export CSV
                     </button>
@@ -601,10 +601,12 @@
                 // 3. Location Filter
                 if (config.locationFilter && item.location !== config.locationFilter) return false;
 
-                // 4. Search Query
+                // 4. Search Query (days aged only, comma = or)
                 if (query) {
-                    const searchable = `${item.itemNumber} ${item.description} ${item.location}`.toLowerCase();
-                    if (!searchable.includes(query)) return false;
+                    const targets = query.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n));
+                    if (targets.length > 0) {
+                        if (item.daysAged === null || !targets.includes(item.daysAged)) return false;
+                    }
                 }
 
                 return true;
@@ -757,4 +759,4 @@
     <footer style="position:fixed;bottom:4px;right:8px;font-size:10px;color:#94a3b8;z-index:9999;">v <span id="ver">loading...</span></footer>
     <script>fetch("https://api.github.com/repos/Mashiro08/jde-inventory-aging-console/commits/main").then(r=>r.json()).then(d=>document.getElementById("ver").textContent=d.sha.slice(0,7)).catch(()=>document.getElementById("ver").textContent="dev");</script>
 </body>
-</html><!-- v 2026-09-25 -->
+</html>
