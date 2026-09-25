@@ -1,0 +1,758 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Packing Aging Units</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- SheetJS / XLSX -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <!-- Custom Tailwind Configuration for theme consistency -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'ui-sans-serif', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'Helvetica Neue', 'Arial', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#eff6ff',
+                            100: '#dbeafe',
+                            500: '#3b82f6',
+                            600: '#2563eb',
+                            700: '#1d4ed8',
+                            900: '#1e3a8a',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        
+        .drag-active {
+            border-color: #3b82f6;
+            background-color: #eff6ff;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9; 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1; 
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8; 
+        }
+
+        .sort-icon {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            vertical-align: text-bottom;
+            opacity: 0.3;
+            transition: opacity 0.2s;
+        }
+        th:hover .sort-icon {
+            opacity: 0.7;
+        }
+        .sort-active {
+            opacity: 1 !important;
+            color: #2563eb;
+        }
+        
+        [v-cloak] { display: none; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col">
+
+    <header class="bg-white border-b border-slate-200 shadow-sm sticky top-0 z-30">
+        <div class="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="bg-brand-600 p-2 rounded-lg text-white">
+                    <i data-lucide="boxes" class="w-5 h-5"></i>
+                </div>
+                <h1 class="text-xl font-semibold text-slate-900 tracking-tight hidden sm:block">Packing Aging Units</h1>
+            </div>
+
+            <div class="flex items-center gap-4">
+                <div style="display: none;" class="flex items-center gap-2 bg-slate-100 p-1.5 rounded-md border border-slate-200">
+                    <label for="referenceDate" class="text-sm font-medium text-slate-600 pl-2 cursor-pointer flex items-center gap-1">
+                        <i data-lucide="calendar" class="w-4 h-4"></i> Ref Date:
+                    </label>
+                    <input type="date" id="referenceDate" class="bg-white border border-slate-300 text-slate-900 text-sm rounded focus:ring-brand-500 focus:border-brand-500 block px-2 py-1 outline-none">
+                    <button id="btnSetToday" class="text-xs bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 px-2 py-1 rounded transition-colors shadow-sm" title="Reset to Today">
+                        Today
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-1 max-w-screen-2xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-col gap-6">
+
+        <div id="uploadSection" class="flex-1 flex flex-col items-center justify-center min-h-[60vh]">
+            <div class="max-w-2xl w-full bg-white rounded-xl shadow-sm border border-slate-200 p-10 text-center">
+                <div class="mx-auto w-20 h-20 bg-brand-50 rounded-full flex items-center justify-center mb-6">
+                    <i data-lucide="file-spreadsheet" class="w-10 h-10 text-brand-600"></i>
+                </div>
+                <h2 class="text-2xl font-bold text-slate-900 mb-2">Upload Inventory Report</h2>
+                <p class="text-slate-500 mb-8 max-w-md mx-auto">Upload your JDE inventory spreadsheet (.xlsx, .xls, .csv) to calculate aging based on today's date.</p>
+                
+                <div id="dropZone" class="border-2 border-dashed border-slate-300 rounded-lg p-12 transition-colors cursor-pointer hover:border-brand-400 hover:bg-brand-50 relative">
+                    <input type="file" id="fileInput" accept=".xlsx, .xls, .csv" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer">
+                    <div class="flex flex-col items-center pointer-events-none">
+                        <i data-lucide="upload-cloud" class="w-8 h-8 text-slate-400 mb-3"></i>
+                        <p class="text-sm font-medium text-slate-700">Drag & drop your file here</p>
+                        <p class="text-xs text-slate-400 mt-1">or click to browse from your computer</p>
+                    </div>
+                </div>
+                
+                <div id="uploadLoading" class="hidden mt-6 flex-col items-center">
+                    <i data-lucide="loader-2" class="w-8 h-8 text-brand-600 animate-spin mb-2"></i>
+                    <p class="text-sm text-slate-600">Processing dataset...</p>
+                </div>
+            </div>
+        </div>
+
+        <div id="dashboardSection" class="hidden flex-col gap-6">
+            
+            <!-- Status Bar -->
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white p-4 rounded-lg shadow-sm border border-slate-200 text-sm">
+                <div class="flex items-center gap-2 mb-2 sm:mb-0 text-slate-600">
+                    <i data-lucide="file-check" class="w-4 h-4 text-green-600"></i>
+                    <span>File: <strong id="lblFileName" class="text-slate-900">dataset.xlsx</strong></span>
+                    <span class="text-slate-300 mx-1">|</span>
+                    <span>Total Rows: <strong id="lblTotalRows" class="text-slate-900">0</strong></span>
+                </div>
+                <button id="btnStartOver" class="text-brand-600 hover:text-brand-800 font-medium flex items-center gap-1 transition-colors">
+                    <i data-lucide="refresh-cw" class="w-4 h-4"></i> Upload Different File
+                </button>
+            </div>
+
+            <div style="display: none;" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <!-- KPI 1 -->
+                <div class="bg-white rounded-lg shadow-sm border border-slate-200 p-5 relative overflow-hidden group hover:border-brand-300 transition-colors">
+                    <div class="absolute right-0 top-0 h-full w-1 bg-yellow-400"></div>
+                    <p class="text-sm font-medium text-slate-500 mb-1">Total Aged Parts (≥3 Days)</p>
+                    <h3 id="kpiAgedParts" class="text-3xl font-bold text-slate-900">0</h3>
+                    <div class="mt-2 text-xs text-slate-500 flex items-center gap-1">
+                        <i data-lucide="alert-triangle" class="w-3 h-3 text-yellow-500"></i> Action required
+                    </div>
+                </div>
+                
+                <!-- KPI 2 -->
+                <div class="bg-white rounded-lg shadow-sm border border-slate-200 p-5 relative overflow-hidden group hover:border-brand-300 transition-colors">
+                    <div class="absolute right-0 top-0 h-full w-1 bg-brand-500"></div>
+                    <p class="text-sm font-medium text-slate-500 mb-1">Total Aged Quantity</p>
+                    <h3 id="kpiAgedQty" class="text-3xl font-bold text-slate-900">0</h3>
+                    <div class="mt-2 text-xs text-slate-500 flex items-center gap-1">
+                        <i data-lucide="layers" class="w-3 h-3 text-brand-500"></i> Units tied up
+                    </div>
+                </div>
+
+                <!-- KPI 3 -->
+                <div class="bg-white rounded-lg shadow-sm border border-slate-200 p-5 relative overflow-hidden group hover:border-red-300 transition-colors">
+                    <div class="absolute right-0 top-0 h-full w-1 bg-red-500"></div>
+                    <p class="text-sm font-medium text-slate-500 mb-1">Severe Critical (≥14 Days)</p>
+                    <h3 id="kpiSevereItems" class="text-3xl font-bold text-red-600">0</h3>
+                    <div class="mt-2 text-xs text-red-500 flex items-center gap-1 font-medium">
+                        <i data-lucide="flame" class="w-3 h-3"></i> Immediate attention
+                    </div>
+                </div>
+                <div class="bg-white rounded-lg shadow-sm border border-slate-200 p-5 relative overflow-hidden group hover:border-red-300 transition-colors">
+                    <div class="absolute right-0 top-0 h-full w-1 bg-red-500"></div>
+                    <p class="text-sm font-medium text-slate-500 mb-1">Severe Critical (≥14 Days)</p>
+                    <h3 id="kpiSevereItems" class="text-3xl font-bold text-red-600">0</h3>
+                    <div class="mt-2 text-xs text-red-500 flex items-center gap-1 font-medium">
+                        <i data-lucide="flame" class="w-3 h-3"></i> Immediate attention
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-lg shadow-sm border border-slate-200 p-4 flex flex-col lg:flex-row gap-4 justify-between items-start lg:items-center">
+                
+                <div class="flex flex-col sm:flex-row gap-4 w-full lg:w-auto flex-1">
+                    <!-- Search -->
+                    <div class="relative flex-1 min-w-[200px] max-w-sm">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <i data-lucide="search" class="w-4 h-4 text-slate-400"></i>
+                        </div>
+                        <input type="text" id="searchInput" placeholder="Search item, desc, location..." class="pl-10 w-full bg-slate-50 border border-slate-300 text-slate-900 text-sm rounded-md focus:ring-brand-500 focus:border-brand-500 block px-3 py-2 outline-none">
+                    </div>
+
+                    <!-- Location Dropdown -->
+                    <div class="relative min-w-[150px]">
+                        <select id="locationFilter" class="w-full bg-slate-50 border border-slate-300 text-slate-900 text-sm rounded-md focus:ring-brand-500 focus:border-brand-500 block px-3 py-2 outline-none appearance-none pr-8">
+                            <option value="">All Locations</option>
+                            <!-- Options injected by JS -->
+                        </select>
+                        <div class="absolute inset-y-0 right-0 pr-2 flex items-center pointer-events-none">
+                            <i data-lucide="chevron-down" class="w-4 h-4 text-slate-500"></i>
+                        </div>
+                    </div>
+                    
+                    <!-- Min Threshold Slider/Input -->
+                    <div class="flex items-center gap-2 bg-slate-50 border border-slate-300 rounded-md px-3 py-1">
+                        <label for="minDaysInput" class="text-xs font-medium text-slate-600 whitespace-nowrap">Min Days:</label>
+                        <input type="number" id="minDaysInput" value="3" min="0" class="w-16 bg-transparent text-sm font-semibold text-slate-900 focus:outline-none text-center">
+                    </div>
+                </div>
+
+                <!-- Category Filters -->
+                <div style="display: none;"class="flex items-center gap-2 overflow-x-auto w-full lg:w-auto pb-2 lg:pb-0 hide-scrollbar">
+                    <button class="filter-btn active bg-slate-800 text-white border border-slate-800 px-3 py-1.5 rounded-md text-sm font-medium whitespace-nowrap transition-colors" data-category="all">
+                        All Filtered
+                    </button>
+                    <button class="filter-btn bg-white hover:bg-yellow-50 text-slate-700 border border-slate-300 hover:border-yellow-300 px-3 py-1.5 rounded-md text-sm font-medium whitespace-nowrap transition-colors flex items-center gap-1" data-category="moderate">
+                        <span class="w-2 h-2 rounded-full bg-yellow-400"></span> 3-7 Days
+                    </button>
+                    <button class="filter-btn bg-white hover:bg-orange-50 text-slate-700 border border-slate-300 hover:border-orange-300 px-3 py-1.5 rounded-md text-sm font-medium whitespace-nowrap transition-colors flex items-center gap-1" data-category="high">
+                        <span class="w-2 h-2 rounded-full bg-orange-400"></span> 8-14 Days
+                    </button>
+                    <button class="filter-btn bg-white hover:bg-red-50 text-slate-700 border border-slate-300 hover:border-red-300 px-3 py-1.5 rounded-md text-sm font-medium whitespace-nowrap transition-colors flex items-center gap-1" data-category="critical">
+                        <span class="w-2 h-2 rounded-full bg-red-500"></span> 15+ Days
+                    </button>
+                </div>
+
+                <div style="display: none;" class="w-full lg:w-auto flex justify-end">
+                    <button id="btnExport" class="bg-brand-50 hover:bg-brand-100 text-brand-700 border border-brand-200 px-3 py-1.5 rounded-md text-sm font-medium transition-colors flex items-center gap-2 whitespace-nowrap">
+                        <i data-lucide="download" class="w-4 h-4"></i> Export CSV
+                    </button>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden flex flex-col">
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-slate-200 text-sm">
+                        <thead class="bg-slate-50">
+                            <tr>
+                                <th scope="col" class="px-4 py-3 text-left font-semibold text-slate-900 cursor-pointer select-none group whitespace-nowrap" data-sort="itemNumber">
+                                    Item Number <i data-lucide="arrow-up-down" class="sort-icon w-3 h-3 ml-1 text-slate-400 group-hover:text-slate-600"></i>
+                                </th>
+
+                                <th scope="col" class="px-4 py-3 text-right font-semibold text-slate-900 cursor-pointer select-none group whitespace-nowrap" data-sort="qty">
+                                    Qty On Hand <i data-lucide="arrow-up-down" class="sort-icon w-3 h-3 ml-1 text-slate-400 group-hover:text-slate-600"></i>
+                                </th>
+
+
+                                <th scope="col" class="px-4 py-3 text-center font-semibold text-slate-900 cursor-pointer select-none group whitespace-nowrap" data-sort="date">
+                                    Last Rcpt <i data-lucide="arrow-up-down" class="sort-icon w-3 h-3 ml-1 text-slate-400 group-hover:text-slate-600"></i>
+                                </th>
+                                <th scope="col" class="px-4 py-3 text-center font-semibold text-slate-900 cursor-pointer select-none group whitespace-nowrap bg-brand-50" data-sort="daysAged">
+                                    Days Aged <i data-lucide="arrow-up" class="sort-icon sort-active w-3 h-3 ml-1 text-brand-600"></i>
+                                </th>
+
+                            </tr>
+                        </thead>
+                        <tbody id="tableBody" class="divide-y divide-slate-200 bg-white">
+                            <!-- Rows injected by JS -->
+                        </tbody>
+                    </table>
+                </div>
+                
+                <!-- Pagination -->
+                <div class="bg-slate-50 border-t border-slate-200 px-4 py-3 flex items-center justify-between sm:px-6">
+                    <div class="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+                        <div>
+                            <p class="text-sm text-slate-700">
+                                Showing <span id="pageStart" class="font-medium">1</span> to <span id="pageEnd" class="font-medium">15</span> of <span id="pageTotal" class="font-medium">0</span> results
+                            </p>
+                        </div>
+                        <div>
+                            <nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+                                <button id="btnPrevPage" class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-slate-300 bg-white text-sm font-medium text-slate-500 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed">
+                                    <span class="sr-only">Previous</span>
+                                    <i data-lucide="chevron-left" class="w-4 h-4"></i>
+                                </button>
+                                <span id="pageIndicator" class="relative inline-flex items-center px-4 py-2 border border-slate-300 bg-white text-sm font-medium text-slate-700">
+                                    Page 1 of 1
+                                </span>
+                                <button id="btnNextPage" class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-slate-300 bg-white text-sm font-medium text-slate-500 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed">
+                                    <span class="sr-only">Next</span>
+                                    <i data-lucide="chevron-right" class="w-4 h-4"></i>
+                                </button>
+                            </nav>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+        </div>
+    </main>
+
+    <script>
+        // State variables
+        let rawData = [];
+        let processedData = [];
+        let filteredData = [];
+        let referenceDate = new Date(); // Defaults to today
+        
+        let config = {
+            minThreshold: 3,
+            searchQuery: '',
+            locationFilter: '',
+            categoryFilter: 'all', // all, moderate, high, critical
+            sortKey: 'daysAged',
+            sortAsc: true,
+            currentPage: 1,
+            itemsPerPage: 15
+        };
+
+        // DOM Elements
+        const elDateInput = document.getElementById('referenceDate');
+        const btnSetToday = document.getElementById('btnSetToday');
+        
+        const uploadSection = document.getElementById('uploadSection');
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+        const uploadLoading = document.getElementById('uploadLoading');
+        
+        const dashboardSection = document.getElementById('dashboardSection');
+        const btnStartOver = document.getElementById('btnStartOver');
+        const lblFileName = document.getElementById('lblFileName');
+        const lblTotalRows = document.getElementById('lblTotalRows');
+        
+        // Formatter utilities
+        const formatCurrency = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
+        const formatNumber = new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 });
+        const formatDateStr = (dateObj) => {
+            if(!dateObj || isNaN(dateObj)) return 'N/A';
+            const yyyy = dateObj.getFullYear();
+            const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
+            const dd = String(dateObj.getDate()).padStart(2, '0');
+            return `${yyyy}-${mm}-${dd}`;
+        };
+
+        function initApp() {
+            lucide.createIcons();
+            setTodayDate();
+            setupEventListeners();
+        }
+
+        function setTodayDate() {
+            const today = new Date();
+            // Set time to midnight for accurate day difference
+            today.setHours(0,0,0,0);
+            referenceDate = today;
+            
+            // Format for input type="date"
+            const yyyy = today.getFullYear();
+            const mm = String(today.getMonth() + 1).padStart(2, '0');
+            const dd = String(today.getDate()).padStart(2, '0');
+            elDateInput.value = `${yyyy}-${mm}-${dd}`;
+        }
+
+        function setupEventListeners() {
+            // Date Controls
+            elDateInput.addEventListener('change', (e) => {
+                if(e.target.value) {
+                    const [y, m, d] = e.target.value.split('-');
+                    referenceDate = new Date(y, m-1, d);
+                    referenceDate.setHours(0,0,0,0);
+                    if(rawData.length > 0) reprocessData();
+                }
+            });
+            btnSetToday.addEventListener('click', () => {
+                setTodayDate();
+                if(rawData.length > 0) reprocessData();
+            });
+
+            // File Upload / Drag & Drop
+            dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('drag-active'); });
+            dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-active'));
+            dropZone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dropZone.classList.remove('drag-active');
+                if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+            });
+            fileInput.addEventListener('change', (e) => {
+                if (e.target.files.length) handleFile(e.target.files[0]);
+            });
+
+            // Start Over
+            btnStartOver.addEventListener('click', () => {
+                fileInput.value = '';
+                rawData = [];
+                dashboardSection.classList.add('hidden');
+                uploadSection.classList.remove('hidden');
+                uploadSection.classList.add('flex');
+            });
+
+            // Filters
+            document.getElementById('searchInput').addEventListener('input', (e) => {
+                config.searchQuery = e.target.value.toLowerCase();
+                config.currentPage = 1;
+                applyFilters();
+            });
+            
+            document.getElementById('locationFilter').addEventListener('change', (e) => {
+                config.locationFilter = e.target.value;
+                config.currentPage = 1;
+                applyFilters();
+            });
+
+            document.getElementById('minDaysInput').addEventListener('input', (e) => {
+                const val = parseInt(e.target.value);
+                config.minThreshold = isNaN(val) ? 0 : val;
+                config.currentPage = 1;
+                applyFilters();
+            });
+
+            // Category Buttons
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    document.querySelectorAll('.filter-btn').forEach(b => {
+                        b.classList.remove('bg-slate-800', 'text-white', 'border-slate-800');
+                        b.classList.add('bg-white', 'text-slate-700');
+                    });
+                    const target = e.currentTarget;
+                    target.classList.remove('bg-white', 'text-slate-700');
+                    target.classList.add('bg-slate-800', 'text-white', 'border-slate-800');
+                    
+                    config.categoryFilter = target.dataset.category;
+                    config.currentPage = 1;
+                    applyFilters();
+                });
+            });
+
+            // Table Sorting
+            document.querySelectorAll('th[data-sort]').forEach(th => {
+                th.addEventListener('click', () => {
+                    const key = th.dataset.sort;
+                    if (config.sortKey === key) {
+                        config.sortAsc = !config.sortAsc; // Toggle direction
+                    } else {
+                        config.sortKey = key;
+                        config.sortAsc = true; // Default asc for new column
+                    }
+                    updateSortIcons();
+                    applyFilters();
+                });
+            });
+
+            // Pagination
+            document.getElementById('btnPrevPage').addEventListener('click', () => {
+                if (config.currentPage > 1) { config.currentPage--; renderTable(); }
+            });
+            document.getElementById('btnNextPage').addEventListener('click', () => {
+                const maxPage = Math.ceil(filteredData.length / config.itemsPerPage);
+                if (config.currentPage < maxPage) { config.currentPage++; renderTable(); }
+            });
+
+            // Export CSV
+            document.getElementById('btnExport').addEventListener('click', exportToCSV);
+        }
+
+        function handleFile(file) {
+            if (!file) return;
+            
+            lblFileName.textContent = file.name;
+            uploadLoading.classList.remove('hidden');
+            uploadLoading.classList.add('flex');
+            dropZone.style.opacity = '0.5';
+            dropZone.style.pointerEvents = 'none';
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array', cellDates: true });
+                    const firstSheetName = workbook.SheetNames[0];
+                    const worksheet = workbook.Sheets[firstSheetName];
+                    
+                    // Parse raw JSON
+                    const json = XLSX.utils.sheet_to_json(worksheet, { raw: false, dateNF: 'yyyy-mm-dd' });
+                    
+                    if (json.length === 0) throw new Error("File appears to be empty.");
+                    
+                    rawData = normalizeData(json);
+                    lblTotalRows.textContent = formatNumber.format(rawData.length);
+                    
+                    populateLocationDropdown();
+                    reprocessData();
+
+                    // Switch views
+                    uploadSection.classList.add('hidden');
+                    uploadSection.classList.remove('flex');
+                    dashboardSection.classList.remove('hidden');
+                    dashboardSection.classList.add('flex');
+                } catch (error) {
+                    console.error(error);
+                    alert("Error processing file. Please ensure it's a valid Excel or CSV with appropriate column headers.");
+                } finally {
+                    uploadLoading.classList.add('hidden');
+                    uploadLoading.classList.remove('flex');
+                    dropZone.style.opacity = '1';
+                    dropZone.style.pointerEvents = 'auto';
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        function normalizeData(jsonArray) {
+            return jsonArray.map((row, index) => {
+                // Find matching keys based on typical JDE/Inventory names
+                const getVal = (possibleKeys) => {
+                    const key = Object.keys(row).find(k => possibleKeys.some(pk => k.toLowerCase().includes(pk)));
+                    return key ? row[key] : null;
+                };
+
+                const itemNumber = getVal(['item number', '2nd item', 'part number', 'item']) || `UNK-${index}`;
+                const description = getVal(['description', 'desc', 'item desc']) || '';
+                const location = getVal(['location', 'loc', 'branch', 'plant']) || 'Unassigned';
+                
+                // Parsing numbers safely
+                const rawQty = getVal(['quantity', 'qty on hand', 'on hand', 'qty']);
+                const qty = parseFloat(String(rawQty).replace(/,/g, '')) || 0;
+                
+                const rawCost = getVal(['unit cost', 'cost']);
+                const cost = parseFloat(String(rawCost).replace(/[$,]/g, '')) || 0;
+                
+                let rawValue = getVal(['inventory value', 'extended cost', 'value']);
+                let value = rawValue ? parseFloat(String(rawValue).replace(/[$,]/g, '')) : (qty * cost);
+                if (isNaN(value)) value = 0;
+
+                // Date Parsing
+                const rawDate = getVal(['last rcpt', 'receipt date', 'rcpt date', 'date']);
+                let dateObj = null;
+                if (rawDate) {
+                    dateObj = new Date(rawDate);
+                    if (isNaN(dateObj.getTime())) dateObj = null; // Invalid date
+                }
+
+                return {
+                    _id: index,
+                    itemNumber: String(itemNumber),
+                    description: String(description),
+                    location: String(location),
+                    qty: qty,
+                    cost: cost,
+                    value: value,
+                    dateStr: rawDate, // keep raw for reference if needed
+                    date: dateObj
+                };
+            });
+        }
+
+        function populateLocationDropdown() {
+            const locSelect = document.getElementById('locationFilter');
+            // Keep default option
+            locSelect.innerHTML = '<option value="">All Locations</option>';
+            
+            const uniqueLocs = [...new Set(rawData.map(item => item.location))].filter(Boolean).sort();
+            uniqueLocs.forEach(loc => {
+                const opt = document.createElement('option');
+                opt.value = loc;
+                opt.textContent = loc;
+                locSelect.appendChild(opt);
+            });
+        }
+
+        function reprocessData() {
+            processedData = rawData.map(item => {
+                let daysAged = null;
+                if (item.date) {
+                    const diffTime = referenceDate.getTime() - item.date.getTime();
+                    daysAged = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+                }
+                
+                let status = 'none';
+                if (daysAged !== null) {
+                    if (daysAged >= 15) status = 'critical';
+                    else if (daysAged >= 8) status = 'high';
+                    else if (daysAged >= 3) status = 'moderate';
+                }
+
+                return { ...item, daysAged, status };
+            });
+            
+            applyFilters();
+        }
+
+        function applyFilters() {
+            const query = config.searchQuery;
+            
+            filteredData = processedData.filter(item => {
+                // 1. Min Threshold
+                if (item.daysAged === null || item.daysAged < config.minThreshold) return false;
+                
+                // 2. Category Filter
+                if (config.categoryFilter !== 'all' && item.status !== config.categoryFilter) return false;
+                
+                // 3. Location Filter
+                if (config.locationFilter && item.location !== config.locationFilter) return false;
+
+                // 4. Search Query
+                if (query) {
+                    const searchable = `${item.itemNumber} ${item.description} ${item.location}`.toLowerCase();
+                    if (!searchable.includes(query)) return false;
+                }
+
+                return true;
+            });
+
+            // Sorting
+            filteredData.sort((a, b) => {
+                let valA = a[config.sortKey];
+                let valB = b[config.sortKey];
+                
+                // Handle nulls in sorting (put them at bottom)
+                if (valA === null) return 1;
+                if (valB === null) return -1;
+
+                if (typeof valA === 'string') valA = valA.toLowerCase();
+                if (typeof valB === 'string') valB = valB.toLowerCase();
+
+                if (valA < valB) return config.sortAsc ? -1 : 1;
+                if (valA > valB) return config.sortAsc ? 1 : -1;
+                return 0;
+            });
+
+            updateKPIs();
+            renderTable();
+        }
+
+        function updateKPIs() {
+            let totalItems = filteredData.length;
+            let totalQty = 0;
+            let severeItems = 0;
+
+            filteredData.forEach(item => {
+                totalQty += item.qty;
+                if (item.daysAged >= 14) severeItems++;
+            });
+
+            // Animate or set values
+            document.getElementById('kpiAgedParts').textContent = formatNumber.format(totalItems);
+            document.getElementById('kpiAgedQty').textContent = formatNumber.format(totalQty);
+            document.getElementById('kpiSevereItems').textContent = formatNumber.format(severeItems);
+        }
+
+        function updateSortIcons() {
+            document.querySelectorAll('th[data-sort] .sort-icon').forEach(icon => {
+                icon.className = `sort-icon w-3 h-3 ml-1 ${icon.parentElement.dataset.sort === config.sortKey ? 'sort-active text-brand-600' : 'text-slate-400'}`;
+                icon.setAttribute('data-lucide', 
+                    icon.parentElement.dataset.sort === config.sortKey 
+                    ? (config.sortAsc ? 'arrow-up' : 'arrow-down') 
+                    : 'arrow-up-down'
+                );
+            });
+            lucide.createIcons();
+        }
+
+        function renderTable() {
+            const tbody = document.getElementById('tableBody');
+            tbody.innerHTML = '';
+
+            const startIdx = (config.currentPage - 1) * config.itemsPerPage;
+            const endIdx = startIdx + config.itemsPerPage;
+            const pageData = filteredData.slice(startIdx, endIdx);
+
+            if (pageData.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="5" class="px-4 py-12 text-center text-slate-500">
+                            <div class="flex flex-col items-center justify-center">
+                                <i data-lucide="inbox" class="w-10 h-10 mb-2 text-slate-300"></i>
+                                <p>No items match current filters.</p>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            } else {
+                pageData.forEach(item => {
+                    const tr = document.createElement('tr');
+                    tr.className = "hover:bg-slate-50 transition-colors group";
+                    
+                    // Status Badge styling
+                    let badgeHtml = `<span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-800">Ok</span>`;
+                    if (item.status === 'moderate') {
+                        badgeHtml = `<span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 border border-yellow-200">3-7 Days</span>`;
+                    } else if (item.status === 'high') {
+                        badgeHtml = `<span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800 border border-orange-200">8-14 Days</span>`;
+                    } else if (item.status === 'critical') {
+                        badgeHtml = `<span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 border border-red-200">15+ Days</span>`;
+                    }
+
+                    tr.innerHTML = `
+                        <td class="px-4 py-3 whitespace-nowrap font-medium text-brand-700">${item.itemNumber}</td>
+                        <td class="px-4 py-3 whitespace-nowrap text-right font-mono text-slate-700">${formatNumber.format(item.qty)}</td>
+                        <td class="px-4 py-3 whitespace-nowrap text-center text-slate-500">${formatDateStr(item.date)}</td>
+                        <td class="px-4 py-3 whitespace-nowrap text-center font-bold ${item.daysAged >= 14 ? 'text-red-600' : 'text-slate-900'} bg-brand-50/30">${item.daysAged !== null ? item.daysAged : 'N/A'}</td>
+
+                    `;
+                    tbody.appendChild(tr);
+                });
+            }
+
+            lucide.createIcons();
+            
+            // Update Pagination UI
+            const totalItems = filteredData.length;
+            const maxPage = Math.ceil(totalItems / config.itemsPerPage) || 1;
+            
+            document.getElementById('pageStart').textContent = totalItems === 0 ? 0 : startIdx + 1;
+            document.getElementById('pageEnd').textContent = Math.min(endIdx, totalItems);
+            document.getElementById('pageTotal').textContent = totalItems;
+            
+            document.getElementById('pageIndicator').textContent = `Page ${config.currentPage} of ${maxPage}`;
+            
+            document.getElementById('btnPrevPage').disabled = config.currentPage === 1;
+            document.getElementById('btnNextPage').disabled = config.currentPage === maxPage;
+        }
+
+        function exportToCSV() {
+            if (filteredData.length === 0) return alert("No data to export.");
+            
+            const headers = ["Item Number", "Description", "Location", "Quantity", "Unit Cost", "Value", "Last Receipt Date", "Days Aged", "Status"];
+            const rows = filteredData.map(item => [
+                `"${item.itemNumber.replace(/"/g, '""')}"`,
+                `"${item.description.replace(/"/g, '""')}"`,
+                `"${item.location.replace(/"/g, '""')}"`,
+                item.qty,
+                item.cost,
+                item.value,
+                formatDateStr(item.date),
+                item.daysAged,
+                item.status.toUpperCase()
+            ]);
+            
+            const csvContent = [headers.join(","), ...rows.map(r => r.join(","))].join("\n");
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            
+            const link = document.createElement("a");
+            link.setAttribute("href", url);
+            const dateStr = formatDateStr(new Date());
+            link.setAttribute("download", `aging_report_${dateStr}.csv`);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        // Boot
+        window.onload = initApp;
+
+    </script>
+</body>
+</html>
