@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Packing Aging Units</title>
+    <title>Packaging Aging Units</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -90,7 +90,7 @@
                 <div class="bg-brand-600 p-2 rounded-lg text-white">
                     <i data-lucide="boxes" class="w-5 h-5"></i>
                 </div>
-                <h1 class="text-xl font-semibold text-slate-900 tracking-tight hidden sm:block">Packing Aging Units</h1>
+                <h1 class="text-xl font-semibold text-slate-900 tracking-tight hidden sm:block">Packaging Aging Units</h1>
             </div>
 
             <div class="flex items-center gap-4">
@@ -754,5 +754,7 @@
         window.onload = initApp;
 
     </script>
+    <footer style="position:fixed;bottom:4px;right:8px;font-size:10px;color:#94a3b8;z-index:9999;">v <span id="ver">loading...</span></footer>
+    <script>fetch("https://api.github.com/repos/Mashiro08/jde-inventory-aging-console/commits/main").then(r=>r.json()).then(d=>document.getElementById("ver").textContent=d.sha.slice(0,7)).catch(()=>document.getElementById("ver").textContent="dev");</script>
 </body>
 </html>
