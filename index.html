@@ -730,7 +730,7 @@
                 `"${item.itemNumber.replace(/"/g, '""')}"`,
                 item.qty,
                 formatDateStr(item.date),
-                item.value,
+                "$" + item.value.toFixed(2),
                 item.daysAged
             ]);
             
