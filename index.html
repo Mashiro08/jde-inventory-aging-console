@@ -725,17 +725,13 @@
         function exportToCSV() {
             if (filteredData.length === 0) return alert("No data to export.");
             
-            const headers = ["Item Number", "Description", "Location", "Quantity", "Unit Cost", "Value", "Last Receipt Date", "Days Aged", "Status"];
+            const headers = ["Item Number", "Qty On Hand", "Last Rcpt", "Value", "Days Aged"];
             const rows = filteredData.map(item => [
                 `"${item.itemNumber.replace(/"/g, '""')}"`,
-                `"${item.description.replace(/"/g, '""')}"`,
-                `"${item.location.replace(/"/g, '""')}"`,
                 item.qty,
-                item.cost,
-                item.value,
                 formatDateStr(item.date),
-                item.daysAged,
-                item.status.toUpperCase()
+                item.value,
+                item.daysAged
             ]);
             
             const csvContent = [headers.join(","), ...rows.map(r => r.join(","))].join("\n");
@@ -745,7 +741,7 @@
             const link = document.createElement("a");
             link.setAttribute("href", url);
             const dateStr = formatDateStr(new Date());
-            link.setAttribute("download", `aging_report_${dateStr}.csv`);
+            link.setAttribute("download", `JDE_Aging_Report_${dateStr}.csv`);
             link.style.visibility = 'hidden';
             document.body.appendChild(link);
             link.click();
